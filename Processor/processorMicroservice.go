@@ -31,6 +31,7 @@ type TrafficSignalStore struct {
 }
 
 var Store TrafficSignalStore
+
 var (
 	totalRequests int64
 	reqPerSecond  int64
@@ -44,7 +45,7 @@ func HandleTrafficSignal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	atomic.AddInt64(&totalRequests, 1)
-	atomic.AddInt64(&reqPerSecond, 1)
+	//atomic.AddInt64(&reqPerSecond, 1)
 
 	var trafficSignal TrafficSignal
 	err := json.NewDecoder(r.Body).Decode(&trafficSignal)
@@ -173,9 +174,12 @@ func UpdateRequestRate() {
 
 		previousTotalRequests = totalRequests
 
+		atomic.StoreInt64(&reqPerSecond, requestsPerSecond)
+
 		Store.mu.Unlock()
 
 		fmt.Printf("Requests per Second: %d\n", requestsPerSecond)
+
 	}
 	//ticker := time.NewTicker(time.Second)
 	//defer ticker.Stop()
