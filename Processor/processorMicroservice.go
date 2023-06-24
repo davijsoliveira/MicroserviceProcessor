@@ -17,11 +17,11 @@ type TrafficSignalData struct {
 }
 
 type TrafficSignal struct {
-	ID              int
-	Congestion      int
-	RedLightTime    int
-	YellowLightTime int
-	GreenLightTime  int
+	Id         int
+	Congestion int
+	TimeRed    int
+	TimeYellow int
+	TimeGreen  int
 }
 
 type TrafficSignalStore struct {
@@ -58,13 +58,13 @@ func HandleTrafficSignal(w http.ResponseWriter, r *http.Request) {
 	Store.mu.Lock()
 	defer Store.mu.Unlock()
 
-	trafficSignalData, ok := Store.TrafficSignals[trafficSignal.ID]
+	trafficSignalData, ok := Store.TrafficSignals[trafficSignal.Id]
 	if !ok {
 		trafficSignalData = &TrafficSignalData{
 			TrafficSignal: trafficSignal,
 			FlowData:      make([]int, 0),
 		}
-		Store.TrafficSignals[trafficSignal.ID] = trafficSignalData
+		Store.TrafficSignals[trafficSignal.Id] = trafficSignalData
 	}
 
 	trafficSignalData.FlowData = append(trafficSignalData.FlowData, trafficSignal.Congestion)
@@ -81,8 +81,8 @@ func HandleTrafficSignal(w http.ResponseWriter, r *http.Request) {
 	trafficSignalData.AverageFlowRate = total / len(trafficSignalData.FlowData)
 
 	// Exibir informações da requisição POST
-	fmt.Printf("Traffic Signal ID: %d, Congestion: %d, Red Light Time: %d, Yellow Light Time: %d, Green Light Time: %d\n",
-		trafficSignal.ID, trafficSignal.Congestion, trafficSignal.RedLightTime, trafficSignal.YellowLightTime, trafficSignal.GreenLightTime)
+	fmt.Printf("Traffic Signal Id: %d, Congestion: %d, Red Light Time: %d, Yellow Light Time: %d, Green Light Time: %d\n",
+		trafficSignal.Id, trafficSignal.Congestion, trafficSignal.TimeRed, trafficSignal.TimeYellow, trafficSignal.TimeGreen)
 
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, "Traffic signal data stored successfully")
@@ -98,7 +98,7 @@ func HandleTrafficSignalInfo(w http.ResponseWriter, r *http.Request) {
 	trafficSignalID := r.URL.Query().Get("id")
 	if trafficSignalID == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "Missing traffic signal ID parameter")
+		fmt.Fprint(w, "Missing traffic signal Id parameter")
 		return
 	}
 
@@ -108,7 +108,7 @@ func HandleTrafficSignalInfo(w http.ResponseWriter, r *http.Request) {
 	trafficSignalIDInt, err := strconv.Atoi(trafficSignalID)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "Invalid traffic signal ID")
+		fmt.Fprint(w, "Invalid traffic signal Id")
 		return
 	}
 
@@ -181,13 +181,46 @@ func UpdateRequestRate() {
 		fmt.Printf("Requests per Second: %d\n", requestsPerSecond)
 
 	}
-	//ticker := time.NewTicker(time.Second)
-	//defer ticker.Stop()
-	//
-	//for range ticker.C {
-	//	currentReqPerSec := atomic.LoadInt64(&reqPerSecond)
-	//	atomic.StoreInt64(&reqPerSecond, 0)
-	//
-	//	fmt.Printf("Requisições por segundo: %d\n", currentReqPerSec)
-	//}
+}
+func HandleTrafficFlow(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprint(w, "Method not allowed")
+		return
+	}
+
+	signalIDParam := r.URL.Query().Get("id")
+	signalID, err := strconv.Atoi(signalIDParam)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, "Invalid signal ID")
+		return
+	}
+
+	Store.mu.Lock()
+	defer Store.mu.Unlock()
+
+	signalData, ok := Store.TrafficSignals[signalID]
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, "Traffic signal not found")
+		return
+	}
+
+	response := struct {
+		TrafficSignal TrafficSignal `json:"trafficSignal"`
+	}{
+		TrafficSignal: signalData.TrafficSignal,
+	}
+
+	jsonResponse, err := json.Marshal(response)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error marshaling response: %v", err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonResponse)
 }
